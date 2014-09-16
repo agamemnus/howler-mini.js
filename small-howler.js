@@ -14,10 +14,14 @@ void function () {
   
   // Create a gain node.
   var gain = howl.gain = (typeof ctx.createGain == "undefined") ? ctx.createGainNode () : ctx.createGain ()
-  gain.gain.value = (typeof options.volume  != "undefined") ? options.volume : 1; gain.connect (ctx.destination)
+  gain.gain.value = (typeof options.volume != "undefined") ? options.volume : 1; gain.connect (ctx.destination)
   
   // Define getters/setters for volume, duration, and position.
-  Object.defineProperty (howl, "volume"  , {get: function () {return gain.gain.value}, set: function (new_volume) {gain.gain.value = new_volume}})
+  Object.defineProperty (howl, "volume"  , {get: function () {return gain.gain.value}, set: function (new_volume) {
+ 
+  gain.gain.value = new_volume
+   console.log (gain.gain.value)
+  }})
   Object.defineProperty (howl, "position", {
    get: function () {return ctx.currentTime},
    set: function (new_position) {
@@ -65,6 +69,7 @@ void function () {
   howl.source = ctx.createBufferSource ()
   howl.source.buffer = howl.buffer
   howl.source.connect (ctx.destination)
+  howl.source.connect (howl.gain)
   howl.paused = false
   howl.ended  = false
   if (howl.paused_position) {
