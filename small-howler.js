@@ -23,9 +23,9 @@ void function () {
    set: function (new_position) {
     if (howl.ended) return
     if (!howl.buffer) return
-    howl.pause ()
+    howl.pause ({do_not_emit_pause_event: true})
     delete (howl.paused_position)
-    howl.play (new_position)
+    howl.play ({position: new_position, do_not_emit_play_event: true, do_not_emit_end_event: true})
    }
   })
   Object.defineProperty (howl, "duration", {get: function () {if (!howl.buffer) return 0; return howl.buffer.duration}})
@@ -38,6 +38,7 @@ void function () {
   howl.paused      = true
   howl.loaded      = false
   howl.ended       = false
+  howl.first_buffer_loaded = false
   
   // Setup event listeners.
   howl.onend       = options.onend
@@ -53,39 +54,48 @@ void function () {
  }
  
  // Play a sound or resume previous playback.
- Howl.prototype.play = function (new_position, no_emit) {
-  var new_position = new_position || 0
+ Howl.prototype.play = function (init) {
+  if (typeof init == "undefined") init = {}
+  if (typeof init == "number") {init.position = init; init = {}}
+  init.position = init.position || 0
+  
   var howl = this
   
+  if (!howl.paused) howl.pause ({do_not_emit_pause_event: true})
   howl.source = ctx.createBufferSource ()
   howl.source.buffer = howl.buffer
   howl.source.connect (ctx.destination)
   howl.paused = false
   howl.ended  = false
   if (howl.paused_position) {
-   howl.started_position = +new Date() - howl.paused_position
+   howl.started_position = +new Date () - howl.paused_position
    howl.source.start (0, howl.paused_position / 1000)
   } else {
-   howl.started_position = +new Date()
-   howl.source.start (new_position)
+   howl.started_position = +new Date ()
+   howl.source.start (init.position)
   }
-  howl.source.onended = function () {howl.ended = true; howl.source.onended = function () {}; howl.paused = true; howl.emit ("end")}
-  if (typeof no_emit == "undefined" || no_emit == false) setTimeout (function () {howl.emit ("play")}, 0)
+  howl.source.onended = function () {howl.ended = true; howl.source.onended = function () {}; howl.paused = true;
+  if (!init.do_not_emit_end_event) howl.emit ("end")}
+  if (!init.do_not_emit_play_event) setTimeout (function () {howl.emit ("play")}, 0)
   return howl
  }
  
- Howl.prototype.pause = function () {
+ Howl.prototype.pause = function (init) {
+  var init = init || {}
   var howl = this
   howl.paused = true
-  if (howl.source) {howl.source.stop (); howl.source.onended = function () {}}
-  howl.paused_position = +new Date() - howl.started_position
+  if (howl.source) {howl.source.onended = function () {}; howl.source.stop ()}
+  howl.paused_position = +new Date () - howl.started_position
+  if (!init.do_not_emit_pause_event) howl.emit ("play")
   return howl
  }
  
- Howl.prototype.emit = function (event_name) {this["on" + event_name] (); return this}
+ Howl.prototype.emit = function (event_name) {
+this["on" + event_name] (); return this}
  
  function load_buffers (howl) {
   if ((typeof howl.buffersize != "undefined") || (typeof howl.bufferfile != "undefined")) {
+   howl.preload_buffer_exists = true
    // Load the buffer from the URL.
    var shortxhr = new XMLHttpRequest ()
    shortxhr.open ('GET', (typeof howl.bufferfile != "undefined") ? howl.bufferfile : howl.src, true)
@@ -96,7 +106,7 @@ void function () {
    shortxhr.responseType = 'arraybuffer'
    shortxhr.onreadystatechange = function () {
    if (shortxhr.readyState != 4) return
-   decodeAudioData (shortxhr.response, howl)}
+   decodeAudioData (shortxhr.response, howl, false)}
    shortxhr.onerror = function () {}
    shortxhr.send ()
   }
@@ -112,7 +122,7 @@ void function () {
   var previous_buffer_exists = (typeof howl.buffer != "undefined")
   
   // Stop any previously loaded buffer and cache the sound position for any upcoming "play" function.
-  if (previous_buffer_exists) howl.pause ()
+  if (previous_buffer_exists) howl.pause ({do_not_emit_pause_event: true})
   
   // Create a new source, add the buffer to it, and push both source and buffer to the source list and buffer list.
   howl.buffer = buffer
@@ -121,10 +131,13 @@ void function () {
   if (!previous_buffer_exists) setTimeout (function () {howl.emit ("load")}, 0)
  }
  
- function decodeAudioData (arraybuffer, howl) {
+ function decodeAudioData (arraybuffer, howl, is_main_buffer) {
   ctx.decodeAudioData (arraybuffer, function (buffer) {
+   var previous_buffer_exists = (typeof howl.buffer != "undefined")
    load_sound (howl, buffer)
-   howl.play ()
+   // If the buffer was loaded before, do not emit the play event.
+   // If the buffer is not the main buffer, do not emit the end event when the audio finishes.
+   if (howl.autoplay) howl.play ({do_not_emit_play_event: previous_buffer_exists, do_not_emit_end_event: !is_main_buffer})
   }, function () {howl.emit("loaderror")})
  }
  
