@@ -1,4 +1,4 @@
-// howler-short.js. (c) 2014, Michael Romanovsky (Flyingsoft games). Licensed under the MIT license.
+// howler-mini.js. (c) 2014, Michael Romanovsky (Flyingsoft games). Licensed under the MIT license.
 
 void function () {
  "use strict"
