@@ -16,7 +16,8 @@ void function () {
   var gain = howl.gain = (typeof ctx.createGain == "undefined") ? ctx.createGainNode () : ctx.createGain ()
   gain.gain.value = (typeof options.volume != "undefined") ? options.volume : 1; gain.connect (ctx.destination)
   
-  // Define getters/setters for volume, duration, and position.
+  // Define getters/setters for .loaded, .volume, .duration, and .position.
+  Object.defineProperty (howl, "loaded", {get: function () {return (!!howl.buffer == true)}})
   Object.defineProperty (howl, "volume"  , {get: function () {return gain.gain.value}, set: function (new_volume) {gain.gain.value = new_volume}})
   Object.defineProperty (howl, "position", {
    get: function () {return (typeof howl.started_date == "undefined") ? 0 : (+new Date () / 1000 - howl.started_date + howl.paused_position)},
@@ -35,7 +36,6 @@ void function () {
   howl.src         = (typeof options.src != "string") ? options.src : options.src
   howl.autoplay    = options.autoplay || false
   howl.paused      = true
-  howl.loaded      = false
   howl.ended       = false
   howl.paused_position = 0
   howl.first_buffer_loaded = false
@@ -85,15 +85,19 @@ void function () {
  Howl.prototype.pause = function (init) {
   var init = init || {}
   var howl = this
-  howl.paused = true
   // If "do_not_stop_autoplay" (set to "true" for loading) is false, .autoplay is "true" and .loaded is "false", set .autoplay to "false".
   if ((!init.do_not_stop_autoplay) && (howl.autoplay == true) && (howl.loaded == false)) howl.autoplay = false
   // Clear the onended event and stop the audio from playing.
   if (howl.source) {howl.source.onended = howl.buffer.onended = function () {}; howl.source.stop ()}
-  // Record when the playing stopped.
-  var current_date = +new Date () / 1000
-  if (typeof howl.started_date == "undefined") howl.started_date = current_date
-  howl.paused_position += current_date - howl.started_date
+  
+  // If the sound was already paused, don't change the pause position.
+  if (!howl.paused) {
+   var current_date = +new Date () / 1000
+   if (typeof howl.started_date == "undefined") howl.started_date = current_date
+   howl.paused_position += current_date - howl.started_date
+  }
+  howl.paused = true
+  
   if (!init.do_not_emit_pause_event) howl.emit ("pause")
   return howl
  }
@@ -128,8 +132,8 @@ void function () {
   var previous_buffer_exists = (typeof howl.buffer != "undefined")
   
   // Stop any previously loaded buffer and cache the sound position for any upcoming "play" function.
-  
   if (previous_buffer_exists) howl.pause ({do_not_stop_autoplay: true, do_not_emit_pause_event: true})
+  
   // Create a new source, add the buffer to it, and push both source and buffer to the source list and buffer list.
   howl.buffer = buffer
   
