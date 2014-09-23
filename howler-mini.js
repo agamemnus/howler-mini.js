@@ -102,7 +102,7 @@ void function () {
   return howl
  }
  
- Howl.prototype.emit = function (event_name) {this["on" + event_name] (); return this}
+ Howl.prototype.emit = function (event_name) {if (typeof this["on" + event_name] == "function") this["on" + event_name] (); return this}
  
  function load_buffers (howl) {
   if ((typeof howl.buffersize != "undefined") || (typeof howl.bufferfile != "undefined")) {
